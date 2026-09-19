@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import struct
 from dataclasses import dataclass, field
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 # Containers whose child boxes start right after the box header.
 PLAIN_CONTAINERS = {
@@ -185,12 +185,67 @@ class BoxEditor:
         container = chain[-1]
         if not container.is_container:
             raise ValueError(f"'{container.fourcc}' is not a container")
-        pos = container.end
-        self._grow(chain, len(blob))
-        self._shift_offsets(pos, len(blob))
-        self.data[pos:pos] = blob
-        self.reparse()
+        self._splice(container.end, 0, blob, chain, shift_from=container.end)
         return self.find(container_path).children[-1]
+
+    def append_child_to(self, container: Box, blob: bytes) -> None:
+        """Like append_child(), for a Box object (needed when several boxes of
+        the same type exist, for example one 'stbl' per track)."""
+        if not container.is_container:
+            raise ValueError(f"'{container.fourcc}' is not a container")
+        chain = self._chain_to(container)
+        self._splice(container.end, 0, blob, chain, shift_from=container.end)
+
+    def replace_box(self, box: Box, blob: bytes) -> None:
+        """Replace one complete box (header included) by blob. Enclosing box
+        sizes and absolute file offsets behind the box are updated."""
+        chain = self._chain_to(box)[:-1]
+        self._splice(box.start, box.size, blob, chain, shift_from=box.end)
+
+    def insert_payload_bytes(self, pos: int, blob: bytes) -> None:
+        """Insert raw bytes at pos inside the payload of a leaf box (for
+        example 'mdat'). Every box that strictly contains pos grows. File
+        offsets that point at or behind pos are shifted, EXCEPT an offset
+        equal to pos, which is treated as the start of the data being
+        extended: the caller adjusts that extent's length itself."""
+        chain = self._chain_containing(pos)
+        self._splice(pos, 0, blob, chain, shift_from=pos + 1)
+
+    def _splice(self, pos: int, old_len: int, blob: bytes, chain: List[Box], *, shift_from: int) -> None:
+        delta = len(blob) - old_len
+        if delta != 0:
+            self._grow(chain, delta)
+            self._shift_offsets(shift_from, delta)
+        self.data[pos:pos + old_len] = blob
+        self.reparse()
+
+    def _chain_to(self, target: Box) -> List[Box]:
+        """Boxes from the root down to and including target."""
+        chain: List[Box] = []
+        level = self.boxes
+        while True:
+            for box in level:
+                if box.start <= target.start and target.end <= box.end:
+                    chain.append(box)
+                    if box is target or (box.start == target.start and box.end == target.end):
+                        return chain
+                    level = box.children
+                    break
+            else:
+                raise ValueError("box is not part of this file (stale Box after an edit?)")
+
+    def _chain_containing(self, pos: int) -> List[Box]:
+        """Boxes that strictly contain the byte position pos, root first."""
+        chain: List[Box] = []
+        level = self.boxes
+        while True:
+            for box in level:
+                if box.start < pos < box.end:
+                    chain.append(box)
+                    level = box.children
+                    break
+            else:
+                return chain
 
     def _grow(self, chain: List[Box], delta: int) -> None:
         for box in chain:
@@ -275,6 +330,82 @@ class BoxEditor:
             if value >= pos:
                 self.write_uint(p, width, value + delta)
             p += width
+
+
+# --- 'iloc' helpers (item locations)
+
+@dataclass
+class ItemExtent:
+    offset_pos: int      # file position of the extent_offset field (0 width possible)
+    length_pos: int      # file position of the extent_length field
+    offset: int          # extent_offset as stored (relative to base_offset)
+    length: int
+
+
+@dataclass
+class ItemLocation:
+    item_id: int
+    construction_method: int
+    data_reference_index: int
+    base_offset: int
+    extents: List[ItemExtent]
+
+    def absolute_extents(self, idat_payload_start: int = 0) -> List[tuple]:
+        """[(absolute file offset, length)] for construction methods 0 and 1."""
+        base = self.base_offset + (idat_payload_start if self.construction_method == 1 else 0)
+        return [(base + e.offset, e.length) for e in self.extents]
+
+
+def iloc_locations(editor: BoxEditor, path: str = "meta/iloc") -> Dict[int, ItemLocation]:
+    box = editor.find(path)
+    p = box.payload_start
+    version = editor.data[p]
+    p += 4
+    sizes = editor.read_uint(p, 2)
+    p += 2
+    offset_size = (sizes >> 12) & 0xF
+    length_size = (sizes >> 8) & 0xF
+    base_offset_size = (sizes >> 4) & 0xF
+    index_size = (sizes & 0xF) if version >= 1 else 0
+    id_width = 2 if version < 2 else 4
+    item_count = editor.read_uint(p, id_width)
+    p += id_width
+    result: Dict[int, ItemLocation] = {}
+    for _ in range(item_count):
+        item_id = editor.read_uint(p, id_width)
+        p += id_width
+        construction_method = 0
+        if version >= 1:
+            construction_method = editor.read_uint(p, 2) & 0xF
+            p += 2
+        data_reference_index = editor.read_uint(p, 2)
+        p += 2
+        base_offset = editor.read_uint(p, base_offset_size)
+        p += base_offset_size
+        extent_count = editor.read_uint(p, 2)
+        p += 2
+        extents = []
+        for _ in range(extent_count):
+            p += index_size
+            offset = editor.read_uint(p, offset_size)
+            offset_pos = p
+            p += offset_size
+            length = editor.read_uint(p, length_size)
+            length_pos = p
+            p += length_size
+            extents.append(ItemExtent(offset_pos, length_pos, offset, length))
+        result[item_id] = ItemLocation(item_id, construction_method, data_reference_index, base_offset, extents)
+    return result
+
+
+def iloc_set_extent_length(editor: BoxEditor, item_id: int, extent_index: int, new_length: int,
+                           path: str = "meta/iloc") -> None:
+    box = editor.find(path)
+    length_size = (editor.read_uint(box.payload_start + 4, 2) >> 8) & 0xF
+    if length_size == 0:
+        raise ValueError("'iloc' has no extent_length field (length_size 0)")
+    extent = iloc_locations(editor, path)[item_id].extents[extent_index]
+    editor.write_uint(extent.length_pos, length_size, new_length)
 
 
 # --- 'ipma' helpers (item property associations)

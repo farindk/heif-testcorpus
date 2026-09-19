@@ -14,7 +14,8 @@ is bit-identical on every machine.
 
 ```
 build-corpus.py        builds the whole corpus (run this)
-corpuslib/             shared helpers: box editing, verified download, patch loading
+corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample tables,
+                       reusable corrections, verified download, patch loading
 sources/<name>/        one directory per image source, scripts and hashes only
     build.py           downloads, verifies and corrects the files of this source
     manifest.txt       pinned upstream commit and sha256 of every upstream file
