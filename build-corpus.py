@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
-"""Build the complete HEIF test corpus.
+"""Build the produced part of the HEIF test corpus.
 
-Runs the build.py of every image source under sources/ and collects the
-generated files under one output directory, one sub-directory per source:
+Runs the build.py of every source under sources/ and writes its files to
+one folder per source under the corpus directory:
 
     corpus/
-      nokiatech-heif-conformance/
-        C001.heic ... SHA256SUMS
+      nokiatech-heif-conformance/     produced: C001.heic ... SHA256SUMS
+      <own images>/                   committed folders, untouched by this script
+
+Produced folders ignore themselves in git through a generated .gitignore.
+The script refuses to write into a non-empty folder that lacks this
+marker, so committed image folders cannot be overwritten by a source of
+the same name.
 
 Downloads are cached under .cache/ so that later builds (for example
 after changing a correction) work offline.
@@ -22,6 +27,9 @@ from typing import List
 
 ROOT = Path(__file__).resolve().parent
 SOURCES_DIR = ROOT / "sources"
+sys.path.insert(0, str(ROOT))
+
+from corpuslib import output  # noqa: E402
 
 
 def discover_sources() -> List[Path]:
@@ -55,6 +63,12 @@ def main(argv: List[str]) -> int:
 
     failed = []
     for source in sources:
+        try:
+            output.prepare_output_dir(args.out / source.name)
+        except output.OutputDirError as e:
+            print(f"error: {e}", file=sys.stderr)
+            failed.append(source.name)
+            continue
         cmd = [sys.executable, str(source / "build.py"),
                "--out", str(args.out / source.name),
                "--cache", str(args.cache / source.name)]

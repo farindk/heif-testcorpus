@@ -19,18 +19,21 @@ by Nokia. Further sources with our own test images will follow.
 ## Layout
 
 ```
-build-corpus.py        builds the whole corpus (run this)
-corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample tables,
-                       reusable corrections, verified download, patch loading
-sources/<name>/        one directory per image source
-    build.py           produces the files of this source: downloads, verifies and
-                       corrects third-party files, or copies checked-in images, or
-                       generates images
-    README.md          provenance, licence, and for third-party files the known defects
+corpus/<name>/         the corpus, one folder per part:
+                       - committed folders hold our own images, with a README.md
+                         for provenance and licence
+                       - produced folders are written by sources/<name>/build.py,
+                         contain a SHA256SUMS file, and ignore themselves in git
+                         through a generated .gitignore
+build-corpus.py        builds every produced folder (run this)
+sources/<name>/        recipe for one produced folder
+    build.py           downloads, verifies and corrects third-party files, or
+                       generates images, and writes them to corpus/<name>/
+    README.md          provenance, licence, known upstream defects
     manifest.txt       third-party sources: pinned upstream commit and sha256 per file
     patches/*.py       third-party sources: one module per correction
-    files/             own sources: checked-in binary images
-corpus/<name>/         generated images (git-ignored), plus a SHA256SUMS file
+corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample tables,
+                       reusable corrections, verified download, patch loading
 .cache/<name>/         unmodified upstream downloads (git-ignored)
 ```
 
@@ -49,7 +52,9 @@ needed on the first run only; the downloads are cached in `.cache/`.
 python3 build-corpus.py
 ```
 
-This writes the corpus to `corpus/<source>/`. Useful options:
+This writes every produced folder to `corpus/<source>/`. The committed folders
+with our own images are complete right after cloning and are not touched by
+the build. Useful options:
 
 ```
 python3 build-corpus.py --out /some/dir        # different output directory
@@ -76,28 +81,35 @@ the `iloc`, `stco` and `co64` file offsets behind the edit. Defects in the
 coded bitstream itself cannot be corrected this way; list those in the
 source's README as known defects instead.
 
-## Adding a source
+## Adding our own images
+
+Create `corpus/<name>/`, put the image files in it and add a `README.md`
+stating where the images come from, what they test and under which licence
+they are published. Commit the folder. There is no build step, and the name
+must not collide with a folder under `sources/`.
+
+## Adding a produced source
 
 Create `sources/<name>/` with a `build.py` that accepts `--out`, `--cache`,
 `--offline` and `--verbose`, and writes the files of the source plus a
 `SHA256SUMS` file to `--out`. `build-corpus.py` picks it up automatically.
-What `build.py` does depends on the kind of source:
+`build.py` must call `corpuslib.output.prepare_output_dir()` on `--out`: it
+writes the self-ignoring `.gitignore` marker and refuses to overwrite a folder
+that was not produced by an earlier build, which protects committed images.
 
 - **Third-party files**: download from a pinned origin, verify against a
   manifest, apply corrections. `sources/nokiatech-heif-conformance/` is the
   template.
-- **Own images checked in as binary files**: keep them under
-  `sources/<name>/files/` and copy them to `--out`.
-- **Own generated images**: run the generator and write its output to `--out`.
+- **Generated images**: run the generator and write its output to `--out`.
   The generator must be deterministic so that the corpus stays bit-identical.
 
-In every case the images end up under `corpus/<name>/`, which is the only
-place consumers need to look.
+Either way the images end up under `corpus/<name>/`, which is the only place
+consumers need to look.
 
 ## Licence
 
 The scripts in this repository are released under the MIT licence, see
 `LICENSE`. Images created for this corpus carry the licence stated in the
-README of their source. Third-party image files remain the property of their
+README of their folder under `corpus/`. Third-party image files remain the property of their
 respective publishers and are subject to their terms; they are downloaded for
 local testing and are not redistributed here.

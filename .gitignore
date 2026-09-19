@@ -1,5 +1,8 @@
-# Generated corpus images and the download cache are never committed.
-/corpus/
+# corpus/ holds committed folders with our own images next to produced
+# folders. Produced folders are not listed here: each one ignores itself
+# through the .gitignore that build-corpus.py writes into it.
+
+# Unmodified third-party downloads are never committed.
 /.cache/
 
 __pycache__/

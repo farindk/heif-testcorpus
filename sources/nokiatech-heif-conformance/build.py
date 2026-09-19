@@ -22,7 +22,7 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
 
-from corpuslib import fetch, patching  # noqa: E402
+from corpuslib import fetch, output, patching  # noqa: E402
 
 SOURCE_NAME = HERE.name
 UPSTREAM_REPO = "https://github.com/nokiatech/heif_conformance"
@@ -70,7 +70,11 @@ def main(argv: List[str]) -> int:
             raise SystemExit(f"not in manifest.txt: {', '.join(sorted(unknown))}")
         manifest = [entry for entry in manifest if entry[0] in args.only]
 
-    args.out.mkdir(parents=True, exist_ok=True)
+    try:
+        output.prepare_output_dir(args.out)
+    except output.OutputDirError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
     args.cache.mkdir(parents=True, exist_ok=True)
 
     downloaded = 0
