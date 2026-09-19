@@ -1,0 +1,6 @@
+# Generated corpus images and the download cache are never committed.
+/corpus/
+/.cache/
+
+__pycache__/
+*.pyc
