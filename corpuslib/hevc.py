@@ -149,21 +149,23 @@ def parse_sps(sps_nal: bytes) -> SpsInfo:
 
 
 def make_hvcC_payload(vps: bytes, sps: bytes, pps: bytes) -> bytes:
-    """HEVCDecoderConfigurationRecord (ISO/IEC 14496-15, 8.3.3.1) with 4 byte
-    NAL unit length fields.
+    """HEVCDecoderConfigurationRecord (ISO/IEC 14496-15:2022, 8.3.2.1) with
+    4 byte NAL unit length fields.
 
-    bitDepthLumaMinus8 and bitDepthChromaMinus8 are 3 bit fields, so the
-    record cannot hold a bit depth of 16. The low 3 bits are written, as GPAC
-    does; readers have to take the bit depth of such a stream from the SPS."""
+    bit_depth_luma_minus8 and bit_depth_chroma_minus8 are 3 bit fields, so
+    the record can signal at most 15 bits. HEVC allows 16 bits, but there is
+    no correct record for such a stream, and it is refused."""
     info = parse_sps(sps)
+    if max(info.bit_depth_luma, info.bit_depth_chroma) > 15:
+        raise ValueError("'hvcC' cannot signal a bit depth of more than 15 bits")
 
     out = bytearray([1])                                  # configurationVersion
     out += info.profile_tier_level
     out += (0xF000 | 0).to_bytes(2, "big")                # min_spatial_segmentation_idc
     out.append(0xFC | 0)                                  # parallelismType: unknown
     out.append(0xFC | info.chroma_format_idc)
-    out.append(0xF8 | ((info.bit_depth_luma - 8) & 7))
-    out.append(0xF8 | ((info.bit_depth_chroma - 8) & 7))
+    out.append(0xF8 | (info.bit_depth_luma - 8))
+    out.append(0xF8 | (info.bit_depth_chroma - 8))
     out += (0).to_bytes(2, "big")                         # avgFrameRate: unspecified
     # constantFrameRate 0, numTemporalLayers, temporalIdNested, lengthSizeMinusOne 3
     out.append((info.num_temporal_layers << 3) | (info.temporal_id_nested << 2) | 3)

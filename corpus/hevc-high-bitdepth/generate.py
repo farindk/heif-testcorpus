@@ -58,11 +58,11 @@ VARIANTS = [
     Variant("hevc-9bit-444-gbr", 9, "444", MATRIX_IDENTITY, "main_444_12", "gbrp9le"),
     Variant("hevc-11bit-420", 11, "420", MATRIX_BT601, "main12", "yuv420p11le"),
     Variant("hevc-15bit-420", 15, "420", MATRIX_BT601, "main_444_16_intra", "yuv420p15le"),
-    Variant("hevc-16bit-400", 16, "400", MATRIX_BT601, "main_444_16_intra", "gray16le"),
-    Variant("hevc-16bit-420", 16, "420", MATRIX_BT601, "main_444_16_intra", "yuv420p16le"),
-    Variant("hevc-16bit-444", 16, "444", MATRIX_BT601, "main_444_16_intra", "yuv444p16le"),
-    Variant("hevc-16bit-444-gbr", 16, "444", MATRIX_IDENTITY, "main_444_16_intra", "gbrp16le"),
 ]
+
+# There is no variant with 16 bits, although HEVC and HM handle it: 'hvcC' can
+# signal at most 15 bits, so that a file with 16 bits cannot be written
+# correctly. corpuslib.hevc.make_hvcC_payload() refuses it.
 
 
 def encode(variant: Variant, encoder: Path, config: Path, workdir: Path) -> List[bytes]:

@@ -56,7 +56,7 @@ Committed image folders:
 
 | Folder | Content |
 |---|---|
-| `hevc-high-bitdepth` | HEVC images with 9, 11, 15 and 16 bits per sample, encoded with the reference software HM, with raw reference planes |
+| `hevc-high-bitdepth` | HEVC images with 9, 11 and 15 bits per sample, encoded with the reference software HM, with raw reference planes |
 
 ## Building the corpus
 
