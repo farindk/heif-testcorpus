@@ -1,0 +1,7 @@
+# Images and reference files are binary, whatever their first bytes look like.
+# Without this, git takes a raw file without zero bytes at its start for text
+# and may convert line endings in it.
+*.heic binary
+*.heif binary
+*.avif binary
+*.raw  binary

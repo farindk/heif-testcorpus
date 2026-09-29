@@ -1,7 +1,7 @@
 """Shared helpers for the source build scripts.
 
 - isobmff:         minimal ISO base media file format box editing for corrections
-- hevc:            HEVC NAL unit header inspection
+- hevc:            HEVC NAL unit header inspection, 'hvcC' for an encoded picture
 - sampletable:     reading and writing ISOBMFF sample tables
 - corrections:     reusable correction operations shared by patch modules
 - fetch:           verified downloads with a local cache

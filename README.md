@@ -38,7 +38,8 @@ corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample 
                        reusable corrections, verified download, patch loading, the
                        manifest-driven build step shared by third-party sources, the
                        build step shared by generating sources, and writers for
-                       generated images (test picture, AVC intra pictures, HEIF files)
+                       generated images (test picture, AVC intra pictures, HEVC
+                       configuration record, HEIF files)
 .cache/<name>/         unmodified upstream downloads (git-ignored)
 ```
 
@@ -49,6 +50,12 @@ Sources currently included:
 | `nokiatech-heif-conformance` | MPEG HEIF and MIAF conformance file candidates published by Nokia |
 | `mpeggroup-fileformatconformance` | HEIF files of the MPEG File Format Conformance repository that are not among the Nokia candidates |
 | `avc-high-bitdepth` | Generated AVC images with 9 and 14 bits per sample, which x264 cannot encode, with raw reference planes |
+
+Committed image folders:
+
+| Folder | Content |
+|---|---|
+| `hevc-high-bitdepth` | HEVC images with 9, 11, 15 and 16 bits per sample, encoded with the reference software HM, with raw reference planes |
 
 ## Building the corpus
 

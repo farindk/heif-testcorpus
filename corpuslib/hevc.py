@@ -1,11 +1,18 @@
-"""Just enough HEVC (ISO/IEC 23008-2) bitstream inspection for corrections.
+"""Just enough HEVC (ISO/IEC 23008-2) bitstream inspection for corrections
+and for storing an encoded picture in a file.
 
-Only NAL unit headers are read. Nothing here decodes slice data.
+Only NAL unit headers and the start of the SPS are read. Nothing here
+decodes slice data.
 """
 
 from __future__ import annotations
 
-from typing import List
+from dataclasses import dataclass
+from typing import List, Tuple
+
+NAL_VPS = 32
+NAL_SPS = 33
+NAL_PPS = 34
 
 NAL_NAMES = {
     0: "TRAIL_N", 1: "TRAIL_R", 2: "TSA_N", 3: "TSA_R", 4: "STSA_N", 5: "STSA_R",
@@ -46,3 +53,145 @@ def hvcc_length_size(hvcc_payload: bytes) -> int:
     if len(hvcc_payload) < 22:
         raise ValueError("truncated 'hvcC'")
     return (hvcc_payload[21] & 0x3) + 1
+
+
+# --- storing the output of an encoder
+
+def split_byte_stream(stream: bytes) -> List[bytes]:
+    """NAL units of a byte stream (Annex B), without start codes."""
+    nals = []
+    p = stream.find(b"\x00\x00\x01")
+    while p >= 0:
+        start = p + 3
+        p = stream.find(b"\x00\x00\x01", start)
+        end = len(stream) if p < 0 else p
+        nal = stream[start:end]
+        # zero bytes in front of the next start code (zero_byte, trailing_zero_8bits)
+        # are not part of the NAL unit, which always ends in a non-zero byte
+        nals.append(nal.rstrip(b"\x00"))
+    if not nals:
+        raise ValueError("no start code found")
+    return nals
+
+
+def unescape_rbsp(payload: bytes) -> bytes:
+    """Remove the emulation prevention bytes (7.4.2) from a NAL unit payload."""
+    out = bytearray()
+    zeros = 0
+    for b in payload:
+        if zeros >= 2 and b == 3:
+            zeros = 0
+            continue
+        out.append(b)
+        zeros = zeros + 1 if b == 0 else 0
+    return bytes(out)
+
+
+class _BitReader:
+    def __init__(self, data: bytes, bit_position: int = 0) -> None:
+        self.data = data
+        self.pos = bit_position
+
+    def u(self, nbits: int) -> int:
+        value = 0
+        for _ in range(nbits):
+            if self.pos >= 8 * len(self.data):
+                raise ValueError("read beyond the end of the NAL unit")
+            value = (value << 1) | ((self.data[self.pos // 8] >> (7 - self.pos % 8)) & 1)
+            self.pos += 1
+        return value
+
+    def ue(self) -> int:
+        zeros = 0
+        while self.u(1) == 0:
+            zeros += 1
+        return (1 << zeros) - 1 + self.u(zeros)
+
+
+@dataclass(frozen=True)
+class SpsInfo:
+    profile_tier_level: bytes  # general_profile_space ... general_level_idc, 12 bytes
+    num_temporal_layers: int
+    temporal_id_nested: int
+    chroma_format_idc: int
+    width: int                 # coded size, before the conformance window is applied
+    height: int
+    bit_depth_luma: int
+    bit_depth_chroma: int
+
+
+def parse_sps(sps_nal: bytes) -> SpsInfo:
+    """Read an SPS up to the bit depths (7.3.2.2). Streams with temporal
+    sub-layers are not supported."""
+    if (sps_nal[0] >> 1) & 0x3F != NAL_SPS:
+        raise ValueError("not an SPS")
+    rbsp = unescape_rbsp(sps_nal[2:])
+
+    max_sub_layers_minus1 = (rbsp[0] >> 1) & 7
+    if max_sub_layers_minus1 != 0:
+        raise ValueError("SPS with temporal sub-layers is not supported")
+
+    r = _BitReader(rbsp, 8 * 13)  # behind profile_tier_level()
+    r.ue()                        # sps_seq_parameter_set_id
+    chroma_format_idc = r.ue()
+    if chroma_format_idc == 3:
+        r.u(1)                    # separate_colour_plane_flag
+    width = r.ue()
+    height = r.ue()
+    if r.u(1):                    # conformance_window_flag
+        for _ in range(4):
+            r.ue()
+    bit_depth_luma = 8 + r.ue()
+    bit_depth_chroma = 8 + r.ue()
+
+    return SpsInfo(rbsp[1:13], max_sub_layers_minus1 + 1, rbsp[0] & 1,
+                   chroma_format_idc, width, height, bit_depth_luma, bit_depth_chroma)
+
+
+def make_hvcC_payload(vps: bytes, sps: bytes, pps: bytes) -> bytes:
+    """HEVCDecoderConfigurationRecord (ISO/IEC 14496-15, 8.3.3.1) with 4 byte
+    NAL unit length fields.
+
+    bitDepthLumaMinus8 and bitDepthChromaMinus8 are 3 bit fields, so the
+    record cannot hold a bit depth of 16. The low 3 bits are written, as GPAC
+    does; readers have to take the bit depth of such a stream from the SPS."""
+    info = parse_sps(sps)
+
+    out = bytearray([1])                                  # configurationVersion
+    out += info.profile_tier_level
+    out += (0xF000 | 0).to_bytes(2, "big")                # min_spatial_segmentation_idc
+    out.append(0xFC | 0)                                  # parallelismType: unknown
+    out.append(0xFC | info.chroma_format_idc)
+    out.append(0xF8 | ((info.bit_depth_luma - 8) & 7))
+    out.append(0xF8 | ((info.bit_depth_chroma - 8) & 7))
+    out += (0).to_bytes(2, "big")                         # avgFrameRate: unspecified
+    # constantFrameRate 0, numTemporalLayers, temporalIdNested, lengthSizeMinusOne 3
+    out.append((info.num_temporal_layers << 3) | (info.temporal_id_nested << 2) | 3)
+
+    out.append(3)                                         # numOfArrays
+    for nal_type, nal in ((NAL_VPS, vps), (NAL_SPS, sps), (NAL_PPS, pps)):
+        if (nal[0] >> 1) & 0x3F != nal_type:
+            raise ValueError(f"expected NAL unit type {nal_type}")
+        out.append(0x80 | nal_type)                       # array_completeness 1
+        out += (1).to_bytes(2, "big")                     # numNalus
+        out += len(nal).to_bytes(2, "big") + nal
+    return bytes(out)
+
+
+def split_parameter_sets(nals: List[bytes]) -> Tuple[bytes, bytes, bytes, bytes]:
+    """Return (vps, sps, pps, sample) for the NAL units of one coded picture:
+    the three parameter sets and everything else with 4 byte length fields,
+    as stored in an 'hvc1' item."""
+    sets = {}
+    sample = bytearray()
+    for nal in nals:
+        nal_type = (nal[0] >> 1) & 0x3F
+        if nal_type in (NAL_VPS, NAL_SPS, NAL_PPS):
+            if nal_type in sets:
+                raise ValueError(f"more than one {NAL_NAMES[nal_type]}")
+            sets[nal_type] = nal
+        else:
+            sample += len(nal).to_bytes(4, "big") + nal
+    if len(sets) != 3:
+        raise ValueError("stream lacks a VPS, SPS or PPS")
+    return sets[NAL_VPS], sets[NAL_SPS], sets[NAL_PPS], bytes(sample)
