@@ -118,6 +118,17 @@ class SpsInfo:
     height: int
     bit_depth_luma: int
     bit_depth_chroma: int
+    # conformance window offsets in luma samples: left, right, top, bottom
+    conformance_window: Tuple[int, int, int, int] = (0, 0, 0, 0)
+
+    @property
+    def cropped_width(self) -> int:
+        """Width of the output picture, after the conformance window is applied."""
+        return self.width - self.conformance_window[0] - self.conformance_window[1]
+
+    @property
+    def cropped_height(self) -> int:
+        return self.height - self.conformance_window[2] - self.conformance_window[3]
 
 
 def parse_sps(sps_nal: bytes) -> SpsInfo:
@@ -138,14 +149,18 @@ def parse_sps(sps_nal: bytes) -> SpsInfo:
         r.u(1)                    # separate_colour_plane_flag
     width = r.ue()
     height = r.ue()
+    window = (0, 0, 0, 0)
     if r.u(1):                    # conformance_window_flag
-        for _ in range(4):
-            r.ue()
+        # The offsets are coded in units of chroma samples (SubWidthC, SubHeightC).
+        sub_width = 2 if chroma_format_idc in (1, 2) else 1
+        sub_height = 2 if chroma_format_idc == 1 else 1
+        left, right, top, bottom = r.ue(), r.ue(), r.ue(), r.ue()
+        window = (left * sub_width, right * sub_width, top * sub_height, bottom * sub_height)
     bit_depth_luma = 8 + r.ue()
     bit_depth_chroma = 8 + r.ue()
 
     return SpsInfo(rbsp[1:13], max_sub_layers_minus1 + 1, rbsp[0] & 1,
-                   chroma_format_idc, width, height, bit_depth_luma, bit_depth_chroma)
+                   chroma_format_idc, width, height, bit_depth_luma, bit_depth_chroma, window)
 
 
 def make_hvcC_payload(vps: bytes, sps: bytes, pps: bytes) -> bytes:

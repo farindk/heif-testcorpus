@@ -15,8 +15,8 @@ generated corpus is bit-identical on every machine.
 
 The third-party sources are the MPEG HEIF conformance file candidates
 published by Nokia and the HEIF files that the MPEG File Format Conformance
-repository adds beyond those. Our own images cover coding formats and bit
-depths that the common encoders do not produce.
+repository adds beyond those. Our own images cover coding formats, bit
+depths and conformance windows that the common encoders do not produce.
 
 ## Layout
 
@@ -57,6 +57,7 @@ Committed image folders:
 | Folder | Content |
 |---|---|
 | `hevc-high-bitdepth` | HEVC images with 9, 11 and 15 bits per sample, encoded with the reference software HM, with raw reference planes |
+| `hevc-conformance-window` | HEVC images with a conformance window that crops on the left and at the top, encoded with the reference software HM, with raw reference planes |
 
 ## Building the corpus
 
