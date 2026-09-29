@@ -318,7 +318,7 @@ def encode_ipcm_picture(pic: Picture, colour: ColourDescription) -> CodedPicture
 
 
 def make_avcC_payload(coded: CodedPicture) -> bytes:
-    """AVCDecoderConfigurationRecord (ISO/IEC 14496-15, 5.3.3.1) with 4 byte
+    """AVCDecoderConfigurationRecord (ISO/IEC 14496-15:2022, 5.3.2.1) with 4 byte
     NAL unit length fields."""
     out = bytearray()
     out += bytes([1, coded.profile_idc, coded.constraint_flags, coded.level_idc])

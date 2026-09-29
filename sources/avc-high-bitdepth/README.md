@@ -59,6 +59,14 @@ and `pixi`. The files carry the brand `mif1` only. They do not claim `avci`,
 because that brand requires the Constrained High profile (ISO/IEC 23008-12
 E.4.1.1), which is limited to 8 bits and 4:2:0.
 
+`avc-14bit-444-gbr.heif` is outside of the range that the file format
+specification gives for `avcC`. ISO/IEC 14496-15:2022, 5.3.2.1.3 limits
+`bit_depth_luma_minus8` and `bit_depth_chroma_minus8` to the values 0 to 4,
+that is to 12 bits. ISO/IEC 14496-10, 7.4.2.1.1 allows 0 to 6, the fields
+have 3 bits, and the file stores the value 6. Its `avcC` states the bit depth
+of the stream correctly, but with a value that the file format does not
+permit.
+
 ## Reference files
 
 `<name>.<pixel format>.raw` holds the expected decoded planes of
