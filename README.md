@@ -33,7 +33,8 @@ sources/<name>/        recipe for one produced folder
     manifest.txt       third-party sources: pinned upstream commit and sha256 per file
     patches/*.py       third-party sources: one module per correction
 corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample tables,
-                       reusable corrections, verified download, patch loading
+                       reusable corrections, verified download, patch loading, and the
+                       manifest-driven build step shared by third-party sources
 .cache/<name>/         unmodified upstream downloads (git-ignored)
 ```
 
@@ -97,9 +98,11 @@ Create `sources/<name>/` with a `build.py` that accepts `--out`, `--cache`,
 writes the self-ignoring `.gitignore` marker and refuses to overwrite a folder
 that was not produced by an earlier build, which protects committed images.
 
-- **Third-party files**: download from a pinned origin, verify against a
-  manifest, apply corrections. `sources/nokiatech-heif-conformance/` is the
-  template.
+- **Third-party files**: list the pinned origin's files with their sha256 in
+  `manifest.txt`, put corrections into `patches/`, and let `build.py` call
+  `corpuslib.manifestsource.run()` with the upstream URL scheme; it downloads,
+  verifies, corrects and writes the files. `sources/nokiatech-heif-conformance/`
+  is the template.
 - **Generated images**: run the generator and write its output to `--out`.
   The generator must be deterministic so that the corpus stays bit-identical.
 
