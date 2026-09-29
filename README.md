@@ -13,9 +13,10 @@ corrections to files that are known to be invalid. Each correction carries the
 hash of the file it expects and the hash of the file it produces, so the
 generated corpus is bit-identical on every machine.
 
-The first sources are the MPEG HEIF conformance file candidates published by
-Nokia and the HEIF files that the MPEG File Format Conformance repository adds
-beyond those. Further sources with our own test images will follow.
+The third-party sources are the MPEG HEIF conformance file candidates
+published by Nokia and the HEIF files that the MPEG File Format Conformance
+repository adds beyond those. Our own images cover coding formats and bit
+depths that the common encoders do not produce.
 
 ## Layout
 
@@ -34,8 +35,10 @@ sources/<name>/        recipe for one produced folder
     manifest.txt       third-party sources: pinned upstream commit and sha256 per file
     patches/*.py       third-party sources: one module per correction
 corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample tables,
-                       reusable corrections, verified download, patch loading, and the
-                       manifest-driven build step shared by third-party sources
+                       reusable corrections, verified download, patch loading, the
+                       manifest-driven build step shared by third-party sources, the
+                       build step shared by generating sources, and writers for
+                       generated images (test picture, AVC intra pictures, HEIF files)
 .cache/<name>/         unmodified upstream downloads (git-ignored)
 ```
 
@@ -45,6 +48,7 @@ Sources currently included:
 |---|---|
 | `nokiatech-heif-conformance` | MPEG HEIF and MIAF conformance file candidates published by Nokia |
 | `mpeggroup-fileformatconformance` | HEIF files of the MPEG File Format Conformance repository that are not among the Nokia candidates |
+| `avc-high-bitdepth` | Generated AVC images with 9 and 14 bits per sample, which x264 cannot encode, with raw reference planes |
 
 ## Building the corpus
 
@@ -105,8 +109,11 @@ that was not produced by an earlier build, which protects committed images.
   `corpuslib.manifestsource.run()` with the upstream URL scheme; it downloads,
   verifies, corrects and writes the files. `sources/nokiatech-heif-conformance/`
   and `sources/mpeggroup-fileformatconformance/` are the templates.
-- **Generated images**: run the generator and write its output to `--out`.
-  The generator must be deterministic so that the corpus stays bit-identical.
+- **Generated images**: let `build.py` call `corpuslib.generatedsource.run()`
+  with a function that returns the generated files and with the pinned sha256
+  of every file. The generator must be deterministic so that the corpus stays
+  bit-identical; a file that differs from its pinned hash fails the build.
+  `sources/avc-high-bitdepth/` is the template.
 
 Either way the images end up under `corpus/<name>/`, which is the only place
 consumers need to look.
