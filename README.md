@@ -13,8 +13,9 @@ corrections to files that are known to be invalid. Each correction carries the
 hash of the file it expects and the hash of the file it produces, so the
 generated corpus is bit-identical on every machine.
 
-The first source is the set of MPEG HEIF conformance file candidates published
-by Nokia. Further sources with our own test images will follow.
+The first sources are the MPEG HEIF conformance file candidates published by
+Nokia and the HEIF files that the MPEG File Format Conformance repository adds
+beyond those. Further sources with our own test images will follow.
 
 ## Layout
 
@@ -43,6 +44,7 @@ Sources currently included:
 | Source | Content |
 |---|---|
 | `nokiatech-heif-conformance` | MPEG HEIF and MIAF conformance file candidates published by Nokia |
+| `mpeggroup-fileformatconformance` | HEIF files of the MPEG File Format Conformance repository that are not among the Nokia candidates |
 
 ## Building the corpus
 
@@ -102,7 +104,7 @@ that was not produced by an earlier build, which protects committed images.
   `manifest.txt`, put corrections into `patches/`, and let `build.py` call
   `corpuslib.manifestsource.run()` with the upstream URL scheme; it downloads,
   verifies, corrects and writes the files. `sources/nokiatech-heif-conformance/`
-  is the template.
+  and `sources/mpeggroup-fileformatconformance/` are the templates.
 - **Generated images**: run the generator and write its output to `--out`.
   The generator must be deterministic so that the corpus stays bit-identical.
 

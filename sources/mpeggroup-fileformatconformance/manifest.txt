@@ -1,0 +1,15 @@
+# Upstream:  https://github.com/MPEGGroup/FileFormatConformance
+# Commit:    767a5bcb9fa4841d1b3bb0ca112a6e7d4c6bf067 (2025-05-29, tip of main)
+# Directory: data/file_features/published/heif/
+#
+# Only the files that are not already covered by nokiatech-heif-conformance
+# are listed; the other 45 files of the directory are byte-identical copies
+# of the Nokia candidates.
+#
+# The files are stored in Git LFS. The sha256 below is the LFS object id from
+# the pointer file, which the download from the LFS media endpoint is
+# verified against. Corrections are applied by the modules in patches/ after
+# the download is verified.
+05908ade3fa126d155f488a98622c7e1ec1dc9e630123da42fc7b162f1b1759f  iff_hevc_single_item.heic
+639ca448743c5fcc6b61f84949ad57a8721e5ecb299df493e17b879f2d21206b  iff_hevc_single_item_main10.heic
+4902df52c32216cbcac1fdd048c591ea660be89180a0cea66378941bdf86c4cb  iff_hevc_tile_multiple_items_tbas.heic
