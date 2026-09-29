@@ -10,6 +10,7 @@
 - manifestsource:  build step shared by the sources that mirror third-party files
 - generatedsource: build step shared by the sources that generate their images
 - avc:             AVC intra picture writer (I_PCM macroblocks) for generated images
+- jpeg:            JPEG writers (flat DCT blocks, lossless) for generated images
 - heifwrite:       writer for HEIF files with a single coded image item
 - testpicture:     the colour gradient test picture of the generated images
 """

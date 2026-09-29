@@ -38,8 +38,8 @@ corpuslib/             shared helpers: box editing, HEVC NAL inspection, sample 
                        reusable corrections, verified download, patch loading, the
                        manifest-driven build step shared by third-party sources, the
                        build step shared by generating sources, and writers for
-                       generated images (test picture, AVC intra pictures, HEVC
-                       configuration record, HEIF files)
+                       generated images (test picture, AVC intra pictures, JPEG,
+                       HEVC configuration record, HEIF files)
 .cache/<name>/         unmodified upstream downloads (git-ignored)
 ```
 
@@ -50,6 +50,7 @@ Sources currently included:
 | `nokiatech-heif-conformance` | MPEG HEIF and MIAF conformance file candidates published by Nokia |
 | `mpeggroup-fileformatconformance` | HEIF files of the MPEG File Format Conformance repository that are not among the Nokia candidates |
 | `avc-high-bitdepth` | Generated AVC images with 9 and 14 bits per sample, which x264 cannot encode, with raw reference planes |
+| `jpeg-rgb-and-high-bitdepth` | Generated JPEG images coded as RGB, with 12 bits per sample, and lossless with 16 bits per sample, with raw reference planes |
 
 Committed image folders:
 
@@ -120,7 +121,8 @@ that was not produced by an earlier build, which protects committed images.
   with a function that returns the generated files and with the pinned sha256
   of every file. The generator must be deterministic so that the corpus stays
   bit-identical; a file that differs from its pinned hash fails the build.
-  `sources/avc-high-bitdepth/` is the template.
+  `sources/avc-high-bitdepth/` and `sources/jpeg-rgb-and-high-bitdepth/` are
+  the templates.
 
 Either way the images end up under `corpus/<name>/`, which is the only place
 consumers need to look.
